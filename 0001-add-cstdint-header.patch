@@ -1,0 +1,65 @@
+From 643b17f4dc26557d73e059dd20a73426bf20b961 Mon Sep 17 00:00:00 2001
+From: Sakura286 <sakura286@outlook.com>
+Date: Tue, 14 May 2024 14:14:31 +0800
+Subject: [PATCH] add cstdint header
+
+---
+ .pc/.quilt_patches                      |  1 +
+ .pc/.quilt_series                       |  1 +
+ .pc/.version                            |  1 +
+ debian/patches/add-cstdint-header.patch | 10 ++++++++++
+ debian/patches/series                   |  1 +
+ 5 files changed, 14 insertions(+)
+ create mode 100644 .pc/.quilt_patches
+ create mode 100644 .pc/.quilt_series
+ create mode 100644 .pc/.version
+ create mode 100644 debian/patches/add-cstdint-header.patch
+ create mode 100644 debian/patches/series
+
+diff --git a/.pc/.quilt_patches b/.pc/.quilt_patches
+new file mode 100644
+index 0000000..6857a8d
+--- /dev/null
++++ b/.pc/.quilt_patches
+@@ -0,0 +1 @@
++debian/patches
+diff --git a/.pc/.quilt_series b/.pc/.quilt_series
+new file mode 100644
+index 0000000..c206706
+--- /dev/null
++++ b/.pc/.quilt_series
+@@ -0,0 +1 @@
++series
+diff --git a/.pc/.version b/.pc/.version
+new file mode 100644
+index 0000000..0cfbf08
+--- /dev/null
++++ b/.pc/.version
+@@ -0,0 +1 @@
++2
+diff --git a/debian/patches/add-cstdint-header.patch b/debian/patches/add-cstdint-header.patch
+new file mode 100644
+index 0000000..888d278
+--- /dev/null
++++ b/debian/patches/add-cstdint-header.patch
+@@ -0,0 +1,10 @@
++--- a/driver/src/dataDumper.cpp
+++++ b/driver/src/dataDumper.cpp
++@@ -4,6 +4,7 @@
++ #define _USE_MATH_DEFINES
++ 
++ #include <math.h>
+++#include <cstdint>
++ #include <string.h>
++ #include <stdio.h>
++ #include <sstream>
+diff --git a/debian/patches/series b/debian/patches/series
+new file mode 100644
+index 0000000..8a4c4bf
+--- /dev/null
++++ b/debian/patches/series
+@@ -0,0 +1 @@
++add-cstdint-header.patch
+-- 
+2.34.1
+
