@@ -1,3 +1,4 @@
+release_repo_url: git@github.com:revyos-ros/sick_scan_xd-release.git
 tracks:
   humble:
     actions:
