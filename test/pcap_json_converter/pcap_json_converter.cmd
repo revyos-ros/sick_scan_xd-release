@@ -13,6 +13,19 @@ echo PYTHON_DIR=%PYTHON_DIR%
 python --version
 @echo.
 
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20241022_lms4000_encoder.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20241021_lms4000_encoder.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20241010-tim781-lidinputstate-toggle-1-9.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20241008_tim781_lidinputstate_telegram.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240909-rms2xxx-field-evaluation.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240909-rms2xxx-field-evaluation-with-rotating-fan.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240527-LRS36x0.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240527-OEM15xx.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240307-MRS1xxx-default-settings-rssiflag3-angres0.2500-scanfreq50.0.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240307-MRS1xxx-default-settings-rssiflag3-angres0.1250-scanfreq25.0.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240307-MRS1xxx-default-settings-rssiflag3-angres0.0625-scanfreq12.5.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240304-MRS1xxx-default-settings-rssiflag-1.pcapng
+python pcap_json_converter.py --pcap_filename=../emulator/scandata/20240304-MRS1xxx-default-settings-rssiflag-3.pcapng
 python pcap_json_converter.py --pcap_filename=../emulator/scandata/20230719_mrs1104_infringement/20230719_mrs1104_ros1_field_eval_activated.pcapng
 python pcap_json_converter.py --pcap_filename=../emulator/scandata/20230719_mrs1104_infringement/20230719_mrs1104_infringement_sopaset_activate_deactivate_activate_again.pcapng
 python pcap_json_converter.py --pcap_filename=../emulator/scandata/20230719_mrs1104_infringement/20230719_mrs1104_infringement_sopaset_default_run.pcapng

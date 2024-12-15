@@ -108,17 +108,21 @@ namespace sick_scan_xd
       */
     bool check_near_plus_minus_pi(float *angle_val)
     {
-       bool angle_slightly_modified = false;
-       float pi_multiplier = *angle_val/M_PI;
-       // float check_deviation_to_abs_one = fabs(pi_multiplier) - 1.0;
-       // check for a small deviation
-       // if (check_deviation_to_abs_one < 10.0 * FLT_EPSILON )
-       if (pi_multiplier > 1.0 - 10.0 * FLT_EPSILON || pi_multiplier < -1.0 + 10.0 * FLT_EPSILON)
-       {
+      bool angle_slightly_modified = false;
+      float pi_multiplier = *angle_val/M_PI;
+      // float check_deviation_to_abs_one = fabs(pi_multiplier) - 1.0;
+      // check for a small deviation
+      // if (check_deviation_to_abs_one < 10.0 * FLT_EPSILON )
+      if (pi_multiplier > 1.1 || pi_multiplier < -1.1)
+      {
+        ROS_WARN_STREAM("check_near_plus_minus_pi: min or max angle = " << *angle_val * 180 / M_PI << " degree, expected angle within -180 to +180 degree, check scan angle shift settings.");
+      }
+      else if (pi_multiplier > 1.0 - 10.0 * FLT_EPSILON || pi_multiplier < -1.0 + 10.0 * FLT_EPSILON)
+      {
         float factor =  (*angle_val < 0.0) ? (-1.0) : (1.0);
         *angle_val = factor * (1.0 - FLT_EPSILON) * M_PI;
         angle_slightly_modified = true;  
-       }
+      }
       else
       {
         angle_slightly_modified =false;
@@ -130,7 +134,7 @@ namespace sick_scan_xd
     /** Parse common result telegrams, i.e. parse telegrams of type LMDscandata received from the lidar */
     bool parseCommonBinaryResultTelegram(const uint8_t* receiveBuffer, int receiveBufferLength, short& elevAngleX200, double elevAngleTelegramValToDeg, double& elevationAngleInRad, rosTime& recvTimeStamp,
         bool config_sw_pll_only_publish, bool use_generation_timestamp, SickGenericParser* parser_, bool& FireEncoder, sick_scan_msg::Encoder& EncoderMsg, int& numEchos, 
-        std::vector<float>& vang_vec, ros_sensor_msgs::LaserScan & msg)
+        std::vector<float>& vang_vec, std::vector<float>& azimuth_vec, ros_sensor_msgs::LaserScan & msg)
     {
                   // bool lms1000_debug = true; // LMS-1000 diagnosis
                   elevAngleX200 = 0;  // signed short (F5 B2  -> Layer 24
@@ -203,17 +207,6 @@ namespace sick_scan_xd
                   //DataDumper::instance().pushData((double)SystemCountScan, "LASERTRANSMITDELAY", debug_duration.toSec());
 #endif
 
-                  /*
-                  uint16_t u16_active_fieldset = 0;
-                  memcpy(&u16_active_fieldset, receiveBuffer + 46, 2); // byte 46 + 47: input status (0 0), active fieldset
-                  swap_endian((unsigned char *) &u16_active_fieldset, 2);
-                  SickScanFieldMonSingleton *fieldMon = SickScanFieldMonSingleton::getInstance();
-                  if(fieldMon)
-                  {
-                    fieldMon->setActiveFieldset(u16_active_fieldset & 0xFF);
-                    ROS_INFO_STREAM("Binary scandata: active_fieldset = " << fieldMon->getActiveFieldset());
-                  }
-                  */
                   // byte 48 + 49: output status (0 0)
                   // byte 50 + 51: reserved
 
@@ -245,6 +238,7 @@ namespace sick_scan_xd
 
                   memcpy(&numOfEncoders, receiveBuffer + 60, 2);
                   swap_endian((unsigned char *) &numOfEncoders, 2);
+                  // ROS_DEBUG_STREAM("numOfEncoders = " << numOfEncoders);
                   int encoderDataOffset = 6 * numOfEncoders;
                   int32_t EncoderPosTicks[4] = {0};
                   int16_t EncoderSpeed[4] = {0};
@@ -300,11 +294,13 @@ namespace sick_scan_xd
                   {
                     process_dist,
                     process_vang,
+                    process_azimuth,
                     process_rssi,
                     process_idle
                   };
                   int rssiCnt = 0;
                   int vangleCnt = 0;
+                  int azimuthCnt = 0;
                   int distChannelCnt = 0;
 
                   for (int processLoop = 0; processLoop < 2; processLoop++)
@@ -324,6 +320,8 @@ namespace sick_scan_xd
                       distChannelCnt = 0;
                       rssiCnt = 0;
                       vangleCnt = 0;
+                      azimuthCnt = 0;
+                      azimuth_vec.clear();
                     }
 
                     if (processLoop == 1)
@@ -346,12 +344,17 @@ namespace sick_scan_xd
                       {
                         vang_vec.clear();
                       }
+                      if (azimuthCnt > 0)
+                      {
+                        azimuth_vec.resize(numberOfItems * azimuthCnt);
+                      }
                       // echoMask = (1 << numEchos) - 1;
 
                       // reset count. We will use the counter for index calculation now.
                       distChannelCnt = 0;
                       rssiCnt = 0;
                       vangleCnt = 0;
+                      azimuthCnt = 0;
 
                     }
 
@@ -368,13 +371,11 @@ namespace sick_scan_xd
 #if 1 // prepared for multiecho parsing
 
                     bCont = true;
-                    bool doVangVecProc = false;
                     // try to get number of DIST and RSSI from binary data
                     task = process_idle;
                     do
                     {
                       task = process_idle;
-                      doVangVecProc = false;
                       int processDataLenValuesInBytes = 2;
 
                       if (totalChannelCnt == numberOf16BitChannels)
@@ -407,9 +408,8 @@ namespace sick_scan_xd
                         numberOfItems = 0;
                         memcpy(&numberOfItems, receiveBuffer + parseOff + 19, 2);
                         swap_endian((unsigned char *) &numberOfItems, 2);
-
                       }
-                      if (strstr(szChannel, "VANG") == szChannel)
+                      if (strstr(szChannel, "VANG") == szChannel) // MRS6000 transmits elevation angles on channel "VANG"
                       {
                         vangleCnt++;
                         task = process_vang;
@@ -417,9 +417,17 @@ namespace sick_scan_xd
                         numberOfItems = 0;
                         memcpy(&numberOfItems, receiveBuffer + parseOff + 19, 2);
                         swap_endian((unsigned char *) &numberOfItems, 2);
-
                         vang_vec.resize(numberOfItems);
-
+                      }
+                      if (strstr(szChannel, "ANGL") == szChannel) // MRS1xxx and LMS1xxx transmit azimuth angles on channel "ANGL"
+                      {
+                        azimuthCnt++;
+                        task = process_azimuth;
+                        bCont = true;
+                        numberOfItems = 0;
+                        memcpy(&numberOfItems, receiveBuffer + parseOff + 19, 2);
+                        swap_endian((unsigned char *) &numberOfItems, 2);
+                        azimuth_vec.resize(numberOfItems);
                       }
                       if (strstr(szChannel, "RSSI") == szChannel)
                       {
@@ -430,7 +438,6 @@ namespace sick_scan_xd
                         // copy two byte value (unsigned short to  numberOfItems
                         memcpy(&numberOfItems, receiveBuffer + parseOff + 19, 2);
                         swap_endian((unsigned char *) &numberOfItems, 2); // swap
-
                       }
                       if (bCont)
                       {
@@ -453,13 +460,13 @@ namespace sick_scan_xd
                         swap_endian((unsigned char *) &sizeOfSingleAngularStepDiv10000, 2);
                         swap_endian((unsigned char *) &numberOfItems, 2);
 
-                        /* if (lms1000_debug) // LMS-1000 diagnosis
+                        if(false) // if (lms1000_debug) // LMS-1000 diagnosis
                         {
-                          ROS_INFO_STREAM("LMDscandata: lidar_scan_time=" << SystemCountScan << " microsec, lidar_transmit_time=" << SystemCountTransmit << " microsec, "
+                          ROS_DEBUG_STREAM("LMDscandata: lidar_scan_time=" << SystemCountScan << " microsec, lidar_transmit_time=" << SystemCountTransmit << " microsec, "
                             << "scan_frequency=" << (0.01 * scanFrequencyX100) << " Hz, measurement_frequency=" << measurementFrequencyDiv100 << " Hz,"
                             << "start_angle=" << (0.0001 * startAngleDiv10000) << " [deg], angular_step="<< (0.0001 * sizeOfSingleAngularStepDiv10000) << " [deg]");
-                          lms1000_debug = false;
-                        } */
+                          // lms1000_debug = false;
+                        } //
 
                         if (processData)
                         {
@@ -501,7 +508,9 @@ namespace sick_scan_xd
                                   msg.time_increment = fabs(parser_->getCurrentParamPtr()->getNumberOfLayers() * msg.scan_time * msg.angle_increment / (2.0 * M_PI));
                               }
 
-                              if (parser_->getCurrentParamPtr()->getScannerName().compare(SICK_SCANNER_NAV_31X_NAME) == 0)
+                              if (parser_->getCurrentParamPtr()->getScannerName().compare(SICK_SCANNER_NAV_31X_NAME) == 0 
+                               || parser_->getCurrentParamPtr()->getScannerName().compare(SICK_SCANNER_LRS_36x0_NAME) == 0
+                               || parser_->getCurrentParamPtr()->getScannerName().compare(SICK_SCANNER_OEM_15XX_NAME) == 0)
                               {
                                 msg.angle_min = (float)(-M_PI);
                                 msg.angle_max = (float)(+M_PI);
@@ -517,17 +526,12 @@ namespace sick_scan_xd
                               }
                               else if (parser_->getCurrentParamPtr()->getScanMirroredAndShifted()) // i.e. for SICK_SCANNER_LRS_36x0_NAME and SICK_SCANNER_NAV_31X_NAME
                               {
-                                /* TODO: Check this ...
-                                msg.angle_min -= (float)(M_PI / 2);
-                                msg.angle_max -= (float)(M_PI / 2);
-                                */
-
                                 msg.angle_min *= -1.0;
                                 msg.angle_increment *= -1.0;
                                 msg.angle_max *= -1.0;
 
                               }
-                              ROS_DEBUG_STREAM("msg.angle_min=" << (msg.angle_min*180/M_PI) << ", msg.angle_max=" << (msg.angle_max*180/M_PI) << ", msg.angle_increment=" << (msg.angle_increment*180/M_PI));
+                              ROS_DEBUG_STREAM("process_dist: msg.angle_min=" << (msg.angle_min*180/M_PI) << ", msg.angle_max=" << (msg.angle_max*180/M_PI) << ", msg.angle_increment=" << (msg.angle_increment*180/M_PI) << ", scaleFactor=" << scaleFactor << ", scaleFactorOffset=" << scaleFactorOffset);
 
                               // Avoid 2*PI wrap around, if (msg.angle_max - msg.angle_min - 2*PI) is slightly above 0.0 due to floating point arithmetics
                               bool wrap_avoid = false;
@@ -548,7 +552,7 @@ namespace sick_scan_xd
                               {
                                 msg.angle_increment = (msg.angle_max - msg.angle_min) / (numberOfItems - 1);
                               }
-                              ROS_DEBUG_STREAM("msg.angle_min=" << (msg.angle_min*180/M_PI) << ", msg.angle_max=" << (msg.angle_max*180/M_PI) << ", msg.angle_increment=" << (msg.angle_increment*180/M_PI));
+                              ROS_DEBUG_STREAM("process_dist: msg.angle_min=" << (msg.angle_min*180/M_PI) << ", msg.angle_max=" << (msg.angle_max*180/M_PI) << ", msg.angle_increment=" << (msg.angle_increment*180/M_PI) << ", scaleFactor=" << scaleFactor << ", scaleFactorOffset=" << scaleFactorOffset << ", " << (8*processDataLenValuesInBytes) << "-bit channel");
 
                               float *rangePtr = NULL;
 
@@ -606,15 +610,54 @@ namespace sick_scan_xd
                             }
                               break;
 
-                            case process_vang:
-                              float *vangPtr = NULL;
+                            case process_vang: // elevation angles MRS6000
                               if (numberOfItems > 0)
                               {
-                                vangPtr = &vang_vec[0]; // much faster, with vang_vec[i] each time the size will be checked
+                                float *vangPtr = &vang_vec[0]; // much faster, with vang_vec[i] each time the size will be checked
+                                for (int i = 0; i < numberOfItems; i++)
+                                {
+                                  vangPtr[i] = (float) data[i] * scaleFactor + scaleFactorOffset;
+                                }
                               }
-                              for (int i = 0; i < numberOfItems; i++)
+                              break;
+
+                            case process_azimuth: // azimuth angles MRS1xxx and LMS1xxx
+                              if (numberOfItems > 0)
                               {
-                                vangPtr[i] = (float) data[i] * scaleFactor + scaleFactorOffset;
+                                if (std::abs(scaleFactorOffset) <= FLT_EPSILON)
+                                {
+                                  // Note: If the firmware of a previous uncalibrated MRS1xxx or LMS1xxx has been upgraded to firmware version 2.3.0 (or newer) without calibrating the azimuth table,
+                                  // the scaleFactorOffset is most likely 0.0, but the azimuth correction table is activated by default.
+                                  // In this case, the following warnings is displayed according to requirements. To avoid the warning, parameter scandatacfg_azimuth_table can be set to value 0
+                                  // (i.e. azimuth correction table deactivated) in the launchfile.
+                                  ROS_WARN_STREAM("## WARNING parseCommonBinaryResultTelegram(): process_azimuth with unexpected scaleFactorOffset=" << scaleFactorOffset << ", expected value is not 0.0");
+                                  ROS_WARN_STREAM("## WARNING parseCommonBinaryResultTelegram(): set parameter scandatacfg_azimuth_table=0 in the launchfile if the lidar has no calibrated azimuth table.");
+                                }
+                                float angle_min_rad = (1.0e-4f * startAngleDiv10000) * M_PI / 180.0 + parser_->getCurrentParamPtr()->getScanAngleShift();
+                                float angle_inc_rad = (1.0e-4f * sizeOfSingleAngularStepDiv10000) * M_PI / 180.0;
+                                float angle_max_rad = angle_min_rad + (numberOfItems - 1) * angle_inc_rad;
+                                ROS_DEBUG_STREAM("process_dist: msg.angle_min=" << (msg.angle_min*180/M_PI) << ", msg.angle_max=" << (msg.angle_max*180/M_PI) << ", msg.angle_increment=" << (msg.angle_increment*180/M_PI));
+                                ROS_DEBUG_STREAM("process_azimuth: angle_min=" << (angle_min_rad*180/M_PI) << ", angle_max=" << (angle_max_rad*180/M_PI) << ", angle_inc=" << (angle_inc_rad*180/M_PI) 
+                                  << ", scaleFactor=" << scaleFactor << ", scaleFactorOffset=" << scaleFactorOffset << ", " << (8*processDataLenValuesInBytes) << "-bit channel");
+                                // angular correction according to "LMS4000---Angular-correction.pptx" for scalefactor=1:
+                                // azimuth = angle_min + (i * angle_inc) + (offset + data[i]) with 0 < i < numberOfItems
+                                float *azimuthPtr = &azimuth_vec[0];
+                                if (processDataLenValuesInBytes == 1)
+                                {
+                                  uint8_t* data_ptr = (uint8_t*) data;
+                                  for (int i = 0; i < numberOfItems; i++)
+                                    azimuthPtr[i] = (angle_min_rad + i * angle_inc_rad + (float)(1.0e-4 * M_PI / 180.0) * ((float)data_ptr[i] * scaleFactor + scaleFactorOffset));
+                                }
+                                else if (processDataLenValuesInBytes == 2)
+                                {
+                                  uint16_t* data_ptr = (uint16_t*) data;
+                                  for (int i = 0; i < numberOfItems; i++)
+                                    azimuthPtr[i] = (angle_min_rad + i * angle_inc_rad + (float)(1.0e-4 * M_PI / 180.0) * ((float)data_ptr[i] * scaleFactor + scaleFactorOffset));
+                                }
+                                // std::stringstream dbg_stream;
+                                // for (int i = 0; i < numberOfItems; i++)
+                                //   dbg_stream << " " << std::fixed << std::setprecision(3) << (azimuth_vec[i]*180/M_PI);
+                                // ROS_DEBUG_STREAM("azimuth table: " << dbg_stream.str());
                               }
                               break;
                           }

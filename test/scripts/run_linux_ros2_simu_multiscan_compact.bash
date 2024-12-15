@@ -17,7 +17,8 @@ function killall_cleanup()
 
 pushd ../../../..
 printf "\033c"
-if   [ -f /opt/ros/humble/setup.bash   ] ; then source /opt/ros/humble/setup.bash
+if   [ -f /opt/ros/jazzy/setup.bash    ] ; then source /opt/ros/jazzy/setup.bash ; export QT_QPA_PLATFORM=xcb
+elif [ -f /opt/ros/humble/setup.bash   ] ; then source /opt/ros/humble/setup.bash
 elif [ -f /opt/ros/foxy/setup.bash     ] ; then source /opt/ros/foxy/setup.bash
 elif [ -f /opt/ros/eloquent/setup.bash ] ; then source /opt/ros/eloquent/setup.bash
 fi
@@ -37,6 +38,7 @@ sleep 1
 
 # Start sick_generic_caller with sick_scansegment_xd
 echo -e "run_lidar3d.bash: sick_scan_xd sick_multiscan.launch.py ..."
+# ros2 run --prefix 'gdb -ex run --args' sick_scan_xd sick_generic_caller ./src/sick_scan_xd/launch/sick_multiscan.launch hostname:=127.0.0.1 udp_receiver_ip:="127.0.0.1" scandataformat:=2
 ros2 launch sick_scan_xd sick_multiscan.launch.py hostname:=127.0.0.1 udp_receiver_ip:="127.0.0.1" scandataformat:=2 &
 sleep 3 
 
